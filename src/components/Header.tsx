@@ -39,8 +39,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center space-x-1.5">
               <span className="font-black tracking-tight text-lg text-white">AZURA<span className="text-sxm-accent">WAVE</span></span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sxm-card border border-sxm-border text-sxm-muted uppercase tracking-wider">
-                {serverConfig.isDemo ? 'DEMO' : 'LIVE'}
+              <span className="flex items-center space-x-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-sxm-neon/15 border border-sxm-neon/30 text-sxm-neon uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-sxm-neon animate-pulse" />
+                <span>LIVE</span>
               </span>
             </div>
           </div>
@@ -64,9 +65,6 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label="Server settings"
           >
             <Settings className="w-4 h-4" />
-            {serverConfig.isDemo && (
-              <span className="absolute 1 top-1 right-1 w-2 h-2 rounded-full bg-amber-400" />
-            )}
           </button>
         </div>
       </div>

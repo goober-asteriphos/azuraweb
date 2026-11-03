@@ -7,7 +7,6 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   Smartphone,
   Share,
   PlusSquare,
@@ -22,7 +21,6 @@ export const SettingsModal: React.FC = () => {
 
   const [baseUrl, setBaseUrl] = useState(serverConfig.baseUrl);
   const [apiKey, setApiKey] = useState(serverConfig.apiKey || '');
-  const [isDemo, setIsDemo] = useState(serverConfig.isDemo);
   const [autoReconnect, setAutoReconnect] = useState(serverConfig.autoReconnect);
   const [preferredQuality, setPreferredQuality] = useState(serverConfig.preferredQuality);
 
@@ -65,7 +63,7 @@ export const SettingsModal: React.FC = () => {
     const updated: ServerConfig = {
       baseUrl: baseUrl.trim(),
       apiKey: apiKey.trim() || undefined,
-      isDemo: isDemo,
+      isDemo: false,
       autoReconnect,
       preferredQuality,
     };
@@ -96,26 +94,17 @@ export const SettingsModal: React.FC = () => {
 
         {/* Scrollable Form */}
         <div className="overflow-y-auto p-5 space-y-5">
-          {/* Demo Mode Toggle Banner */}
-          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-sxm-card to-sxm-surface border border-sxm-border flex items-center justify-between">
+          {/* Active Connected Instance Banner */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-sxm-card to-sxm-surface border border-sxm-neon/30 flex items-center justify-between">
             <div className="space-y-0.5">
               <div className="flex items-center space-x-1.5">
-                <Sparkles className="w-4 h-4 text-sxm-accent" />
-                <span className="text-sm font-bold text-white">Demo Channels Mode</span>
+                <span className="w-2 h-2 rounded-full bg-sxm-neon animate-pulse" />
+                <span className="text-sm font-bold text-white">Connected AzuraCast Instance</span>
               </div>
-              <p className="text-[11px] text-sxm-muted">
-                Preview with curated demo radio stations & public streams
+              <p className="text-[11px] text-sxm-muted truncate max-w-[280px]">
+                {baseUrl || 'No instance URL configured'}
               </p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isDemo}
-                onChange={(e) => setIsDemo(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-sxm-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sxm-accent"></div>
-            </label>
           </div>
 
           {/* AzuraCast Instance URL */}
@@ -128,29 +117,26 @@ export const SettingsModal: React.FC = () => {
                 type="url"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://radio.yourdomain.com"
-                disabled={isDemo}
-                className="w-full bg-sxm-card border border-sxm-border rounded-xl px-4 py-3 text-sm text-white placeholder-sxm-muted focus:outline-none focus:border-sxm-accent disabled:opacity-50"
+                placeholder="https://radio.asteriphos.com"
+                className="w-full bg-sxm-card border border-sxm-border rounded-xl px-4 py-3 text-sm text-white placeholder-sxm-muted focus:outline-none focus:border-sxm-accent"
               />
             </div>
             <p className="text-[11px] text-sxm-muted">
-              Enter the full HTTPS base URL of your AzuraCast instance.
+              Defaulted from your <code className="text-sxm-accent font-mono text-[10px]">VITE_AZURACAST_BASE_URL</code> environment variable.
             </p>
 
             {/* Test connection button */}
-            {!isDemo && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={testStatus.testing || !baseUrl}
-                  className="px-4 py-2 rounded-xl bg-sxm-card hover:bg-sxm-card-hover border border-sxm-border text-xs font-bold text-white flex items-center space-x-2 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${testStatus.testing ? 'animate-spin' : ''}`} />
-                  <span>{testStatus.testing ? 'Testing Connection...' : 'Test Server Connection'}</span>
-                </button>
-              </div>
-            )}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testStatus.testing || !baseUrl}
+                className="px-4 py-2 rounded-xl bg-sxm-card hover:bg-sxm-card-hover border border-sxm-border text-xs font-bold text-white flex items-center space-x-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testStatus.testing ? 'animate-spin' : ''}`} />
+                <span>{testStatus.testing ? 'Testing Connection...' : 'Test Server Connection'}</span>
+              </button>
+            </div>
 
             {testStatus.message && (
               <div
@@ -183,8 +169,7 @@ export const SettingsModal: React.FC = () => {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Your AzuraCast API key..."
-              disabled={isDemo}
-              className="w-full bg-sxm-card border border-sxm-border rounded-xl px-4 py-3 text-sm text-white placeholder-sxm-muted focus:outline-none focus:border-sxm-accent disabled:opacity-50"
+              className="w-full bg-sxm-card border border-sxm-border rounded-xl px-4 py-3 text-sm text-white placeholder-sxm-muted focus:outline-none focus:border-sxm-accent"
             />
           </div>
 

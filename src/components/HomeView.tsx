@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Heart, Radio, Users, Sparkles } from 'lucide-react';
+import { Play, Pause, Heart, Radio, Users, Sparkles, RefreshCw } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { AzuraCastNowPlaying } from '../types/azuracast';
 
@@ -18,6 +18,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ filteredStations }) => {
     isFavorite,
     recents,
     stations,
+    isLoading,
+    refreshStations,
   } = usePlayer();
 
   // Featured station is either the one currently live with DJ, or the first station
@@ -40,6 +42,58 @@ export const HomeView: React.FC<HomeViewProps> = ({ filteredStations }) => {
       playStation(station);
     }
   };
+
+  // Loading Skeleton State
+  if (isLoading && stations.length === 0) {
+    return (
+      <div className="space-y-6 pb-24 px-4 pt-3 animate-pulse">
+        {/* Hero banner skeleton */}
+        <div className="h-44 rounded-3xl bg-sxm-card/70 border border-sxm-border/40" />
+        
+        {/* Recents skeleton */}
+        <div className="space-y-2">
+          <div className="h-4 w-24 bg-sxm-card rounded" />
+          <div className="flex space-x-3 overflow-hidden">
+            <div className="w-32 h-36 bg-sxm-card/70 rounded-2xl flex-shrink-0" />
+            <div className="w-32 h-36 bg-sxm-card/70 rounded-2xl flex-shrink-0" />
+            <div className="w-32 h-36 bg-sxm-card/70 rounded-2xl flex-shrink-0" />
+          </div>
+        </div>
+
+        {/* List skeleton */}
+        <div className="space-y-2">
+          <div className="h-4 w-32 bg-sxm-card rounded" />
+          <div className="h-20 bg-sxm-card/60 rounded-2xl" />
+          <div className="h-20 bg-sxm-card/60 rounded-2xl" />
+          <div className="h-20 bg-sxm-card/60 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Empty State (if offline or server unreachable)
+  if (stations.length === 0) {
+    return (
+      <div className="text-center py-20 px-6 space-y-4">
+        <div className="w-16 h-16 rounded-full bg-sxm-accent/15 border border-sxm-accent/30 flex items-center justify-center mx-auto text-sxm-accent">
+          <Radio className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-lg font-black text-white">No Channels Found</h3>
+          <p className="text-xs text-sxm-muted max-w-xs mx-auto mt-1">
+            Could not retrieve stations from your AzuraCast instance. Check your connection or server status.
+          </p>
+        </div>
+        <button
+          onClick={() => refreshStations()}
+          className="px-5 py-2.5 rounded-2xl bg-sxm-accent text-black font-black text-xs inline-flex items-center space-x-2 active:scale-95 transition-transform"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span>Retry Connection</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-24 px-4 pt-3">

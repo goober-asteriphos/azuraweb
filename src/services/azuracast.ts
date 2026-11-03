@@ -1,5 +1,4 @@
 import { AzuraCastNowPlaying, AzuraCastRequestSong, ServerConfig } from '../types/azuracast';
-import { DEMO_STATIONS } from '../data/demoStations';
 
 const CATEGORY_MAP: Record<string, string> = {
   pop: 'Pop & Hits',
@@ -18,6 +17,7 @@ const CATEGORY_MAP: Record<string, string> = {
   classical: 'Classical',
   news: 'News & Talk',
   talk: 'News & Talk',
+  country: 'Country',
   decades: 'Decades',
   '80s': 'Decades',
   '90s': 'Decades',
@@ -31,6 +31,7 @@ const ACCENT_COLORS = [
   '#f59e0b', // amber
   '#38bdf8', // sky blue
   '#ec4899', // pink
+  '#10b981', // emerald
 ];
 
 export class AzuraCastService {
@@ -47,7 +48,7 @@ export class AzuraCastService {
   public updateConfig(newConfig: ServerConfig) {
     this.config = newConfig;
     this.stopSync();
-    if (!newConfig.isDemo) {
+    if (newConfig.baseUrl) {
       this.startSync();
     }
   }
@@ -79,7 +80,7 @@ export class AzuraCastService {
       }
 
       // If URL is relative, prepend baseUrl
-      if (artUrl && artUrl.startsWith('/') && !this.config.isDemo) {
+      if (artUrl && artUrl.startsWith('/') && this.config.baseUrl) {
         artUrl = `${this.cleanUrl(this.config.baseUrl)}${artUrl}`;
       }
 
@@ -99,11 +100,10 @@ export class AzuraCastService {
     });
   }
 
-  // Fetch all stations now playing
+  // Fetch all stations now playing from the live instance
   public async fetchNowPlaying(): Promise<AzuraCastNowPlaying[]> {
-    if (this.config.isDemo || !this.config.baseUrl) {
-      this.stationsCache = DEMO_STATIONS;
-      return DEMO_STATIONS;
+    if (!this.config.baseUrl) {
+      return [];
     }
 
     try {
@@ -130,9 +130,9 @@ export class AzuraCastService {
       this.stationsCache = enriched;
       return enriched;
     } catch (err) {
-      console.warn('Failed to fetch from AzuraCast instance, falling back to cached or demo data:', err);
+      console.warn('Failed to fetch from AzuraCast instance:', err);
       if (this.stationsCache.length > 0) return this.stationsCache;
-      return DEMO_STATIONS;
+      return [];
     }
   }
 
@@ -163,50 +163,10 @@ export class AzuraCastService {
     }
   }
 
-  // Fetch song request queue / eligible songs
+  // Fetch song request queue / eligible songs from the live instance
   public async fetchRequests(stationId: number): Promise<AzuraCastRequestSong[]> {
-    if (this.config.isDemo || !this.config.baseUrl) {
-      return [
-        {
-          request_id: 'req-1',
-          request_url: '#',
-          song: {
-            id: 'r1',
-            text: 'Daft Punk - One More Time',
-            artist: 'Daft Punk',
-            title: 'One More Time',
-            album: 'Discovery',
-            genre: 'Electronic',
-            art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80',
-          },
-        },
-        {
-          request_id: 'req-2',
-          request_url: '#',
-          song: {
-            id: 'r2',
-            text: 'The Killers - Mr. Brightside',
-            artist: 'The Killers',
-            title: 'Mr. Brightside',
-            album: 'Hot Fuss',
-            genre: 'Alt Rock',
-            art: 'https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?w=300&auto=format&fit=crop&q=80',
-          },
-        },
-        {
-          request_id: 'req-3',
-          request_url: '#',
-          song: {
-            id: 'r3',
-            text: 'Gorillaz - Feel Good Inc.',
-            artist: 'Gorillaz',
-            title: 'Feel Good Inc.',
-            album: 'Demon Days',
-            genre: 'Alternative',
-            art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300&auto=format&fit=crop&q=80',
-          },
-        },
-      ];
+    if (!this.config.baseUrl) {
+      return [];
     }
 
     try {
@@ -222,10 +182,10 @@ export class AzuraCastService {
     }
   }
 
-  // Submit a song request
+  // Submit a song request to the live instance
   public async submitRequest(requestUrl: string): Promise<{ success: boolean; message: string }> {
-    if (this.config.isDemo || requestUrl === '#') {
-      return { success: true, message: 'Song request placed! It will play shortly.' };
+    if (!requestUrl || requestUrl === '#') {
+      return { success: false, message: 'Invalid request URL' };
     }
 
     try {
@@ -246,12 +206,7 @@ export class AzuraCastService {
   // Real-time synchronization (SSE with Polling fallback)
   public startSync(callback?: (stations: AzuraCastNowPlaying[]) => void) {
     if (callback) this.onUpdateCallback = callback;
-    if (this.config.isDemo) {
-      this.pollInterval = setInterval(() => {
-        if (this.onUpdateCallback) this.onUpdateCallback(DEMO_STATIONS);
-      }, 10000);
-      return;
-    }
+    if (!this.config.baseUrl) return;
 
     const baseUrl = this.cleanUrl(this.config.baseUrl);
 
@@ -272,7 +227,6 @@ export class AzuraCastService {
           const raw = JSON.parse(event.data);
           const npData = raw?.pub?.data?.np;
           if (npData) {
-            // Update cached station
             const list = Array.isArray(npData) ? npData : [npData];
             const updated = this.enrichStations(list);
             this.stationsCache = updated;
@@ -301,7 +255,9 @@ export class AzuraCastService {
     this.pollInterval = setInterval(async () => {
       try {
         const stations = await this.fetchNowPlaying();
-        if (this.onUpdateCallback) this.onUpdateCallback(stations);
+        if (this.onUpdateCallback && stations.length > 0) {
+          this.onUpdateCallback(stations);
+        }
       } catch (err) {
         console.warn('Poll error:', err);
       }

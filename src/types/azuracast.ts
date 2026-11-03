@@ -94,7 +94,7 @@ export interface AzuraCastRequestSong {
 export interface ServerConfig {
   baseUrl: string;
   apiKey?: string;
-  isDemo: boolean;
+  isDemo?: boolean;
   autoReconnect: boolean;
   preferredQuality: 'auto' | 'high' | 'standard' | 'low';
 }

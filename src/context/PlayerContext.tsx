@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AzuraCastNowPlaying, AzuraCastMount, ServerConfig } from '../types/azuracast';
 import { AzuraCastService } from '../services/azuracast';
-import { DEMO_STATIONS } from '../data/demoStations';
 
 interface PlayerContextType {
   // Data
@@ -64,26 +63,36 @@ interface PlayerContextType {
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
+const envBaseUrl = (import.meta as any).env?.VITE_AZURACAST_BASE_URL || '';
+
 const DEFAULT_CONFIG: ServerConfig = {
-  baseUrl: (import.meta as any).env?.VITE_AZURACAST_BASE_URL || '',
-  isDemo: !(import.meta as any).env?.VITE_AZURACAST_BASE_URL,
+  baseUrl: envBaseUrl,
+  isDemo: false,
   autoReconnect: true,
   preferredQuality: 'auto',
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load saved configuration from localStorage
+  // Load saved configuration from localStorage, prioritizing .env when set
   const [serverConfig, setServerConfig] = useState<ServerConfig>(() => {
     try {
       const saved = localStorage.getItem('azurawave_config');
-      return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          baseUrl: envBaseUrl || parsed.baseUrl || '',
+          isDemo: false,
+        };
+      }
+      return DEFAULT_CONFIG;
     } catch {
       return DEFAULT_CONFIG;
     }
   });
 
-  const [stations, setStations] = useState<AzuraCastNowPlaying[]>(DEMO_STATIONS);
-  const [currentStation, setCurrentStation] = useState<AzuraCastNowPlaying | null>(DEMO_STATIONS[0]);
+  const [stations, setStations] = useState<AzuraCastNowPlaying[]>([]);
+  const [currentStation, setCurrentStation] = useState<AzuraCastNowPlaying | null>(null);
   const [selectedMount, setSelectedMount] = useState<AzuraCastMount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -106,22 +115,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
   const [sleepTimerRemaining, setSleepTimerRemaining] = useState<number | null>(null);
 
-  // Favorites & Recents
+  // Favorites & Recents - start clean
   const [favorites, setFavorites] = useState<number[]>(() => {
     try {
       const saved = localStorage.getItem('azurawave_favorites');
-      return saved ? JSON.parse(saved) : [1, 3];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return [1, 3];
+      return [];
     }
   });
 
   const [recents, setRecents] = useState<number[]>(() => {
     try {
       const saved = localStorage.getItem('azurawave_recents');
-      return saved ? JSON.parse(saved) : [1, 2, 3];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return [1, 2, 3];
+      return [];
     }
   });
 
@@ -129,12 +138,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const azuraServiceRef = useRef<AzuraCastService | null>(null);
 
-  // Initialize service
   if (!azuraServiceRef.current) {
     azuraServiceRef.current = new AzuraCastService(serverConfig);
   }
 
-  // Save favorites & config
+  // Save favorites, recents & config
   useEffect(() => {
     try {
       localStorage.setItem('azurawave_favorites', JSON.stringify(favorites));
@@ -178,7 +186,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     audio.onerror = (e) => {
       console.warn('Audio stream error, attempting recovery...', e);
       setIsBuffering(false);
-      // Auto reconnect on stream hitch
       if (serverConfig.autoReconnect && isPlaying) {
         setTimeout(() => {
           if (audioRef.current && currentStation) {
@@ -242,7 +249,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       playNextStation();
     });
 
-    // Update Lock Screen elapsed track progress if supported
     if ('setPositionState' in navigator.mediaSession && currentStation.now_playing?.duration > 0) {
       try {
         navigator.mediaSession.setPositionState({
@@ -256,7 +262,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentStation, liveElapsed]);
 
-  // Sync media session when station or track updates
   useEffect(() => {
     updateMediaSession();
   }, [updateMediaSession]);
@@ -286,7 +291,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const interval = setInterval(() => {
       setSleepTimerRemaining((prev) => {
         if (prev === null || prev <= 1) {
-          // Timer finished! Fade volume and pause
           if (audioRef.current) {
             audioRef.current.pause();
             setIsPlaying(false);
@@ -301,7 +305,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => clearInterval(interval);
   }, [sleepTimerRemaining]);
 
-  // Load stations & start real-time updates
+  // Load stations & start real-time updates from the live instance
   const refreshStations = useCallback(async () => {
     if (!azuraServiceRef.current) return;
     setIsLoading(true);
@@ -309,7 +313,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const data = await azuraServiceRef.current.fetchNowPlaying();
       if (data && data.length > 0) {
         setStations(data);
-        // If currentStation is set, refresh its info
         setCurrentStation((prev) => {
           if (!prev) return data[0];
           const found = data.find((s) => s.station.id === prev.station.id);
@@ -321,7 +324,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Update server config
   const updateServerConfig = useCallback((newConfig: ServerConfig) => {
     setServerConfig(newConfig);
     if (azuraServiceRef.current) {
@@ -353,7 +355,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [refreshStations]);
 
-  // Determine stream URL for a station
   const getStreamUrl = (station: AzuraCastNowPlaying, mount?: AzuraCastMount | null): string => {
     if (mount?.url) return mount.url;
     if (station.station.mounts && station.station.mounts.length > 0) {
@@ -363,7 +364,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return station.station.listen_url;
   };
 
-  // Play a specific station
   const playStation = useCallback((station: AzuraCastNowPlaying, mountOverride?: AzuraCastMount) => {
     setCurrentStation(station);
     const chosenMount = mountOverride || (station.station.mounts?.find((m) => m.is_default) || station.station.mounts?.[0] || null);
@@ -372,7 +372,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const streamUrl = getStreamUrl(station, chosenMount);
     if (!audioRef.current || !streamUrl) return;
 
-    // Cache busting / live-edge parameter
     const liveStreamUrl = streamUrl.includes('?')
       ? `${streamUrl}&_live=${Date.now()}`
       : `${streamUrl}?_live=${Date.now()}`;
@@ -394,7 +393,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsPlaying(false);
       });
 
-    // Add to recents
     setRecents((prev) => {
       const filtered = prev.filter((id) => id !== station.station.id);
       return [station.station.id, ...filtered].slice(0, 8);
@@ -405,7 +403,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Toggle play / pause
   const togglePlayPause = useCallback(() => {
     if (!audioRef.current) return;
 
@@ -416,7 +413,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!currentStation && stations.length > 0) {
         playStation(stations[0]);
       } else if (currentStation) {
-        // If stream was paused for a while, reconnect to live edge
         const streamUrl = getStreamUrl(currentStation, selectedMount);
         audioRef.current.src = `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}_live=${Date.now()}`;
         audioRef.current.load();
@@ -428,7 +424,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isPlaying, currentStation, stations, selectedMount, playStation]);
 
-  // Next / Previous station navigation
   const playNextStation = useCallback(() => {
     if (stations.length === 0) return;
     const currentIndex = stations.findIndex((s) => s.station.id === currentStation?.station.id);
@@ -443,7 +438,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playStation(stations[prevIndex]);
   }, [stations, currentStation, playStation]);
 
-  // Jump to live edge
   const jumpToLive = useCallback(() => {
     if (!currentStation || !audioRef.current) return;
     const streamUrl = getStreamUrl(currentStation, selectedMount);
@@ -455,13 +449,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [currentStation, selectedMount]);
 
-  // Rewind 15s (simulated stream jump or buffer shift)
   const rewind15 = useCallback(() => {
     setIsLiveEdge(false);
     setLiveElapsed((prev) => Math.max(0, prev - 15));
   }, []);
 
-  // Volume
   const setVolume = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setVolumeState(clamped);
@@ -482,7 +474,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isMuted]);
 
-  // Mount selection
   const setMount = useCallback((mount: AzuraCastMount) => {
     setSelectedMount(mount);
     if (currentStation) {
@@ -490,19 +481,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentStation, playStation]);
 
-  // Sleep timer
   const setSleepTimer = useCallback((minutes: number | null) => {
     setSleepTimerMinutes(minutes);
     setSleepTimerRemaining(minutes ? minutes * 60 : null);
   }, []);
 
-  // Favorite toggle
   const toggleFavorite = useCallback((stationId: number) => {
     setFavorites((prev) => {
       if (prev.includes(stationId)) {
         return prev.filter((id) => id !== stationId);
       }
-      // Haptic feedback if available on iOS
       if ('vibrate' in navigator) {
         try {
           navigator.vibrate(25);

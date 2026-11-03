@@ -50,8 +50,19 @@ export const GuideView: React.FC<GuideViewProps> = ({ stations }) => {
         </span>
       </div>
 
-      <div className="divide-y divide-sxm-border/40 bg-sxm-surface rounded-3xl border border-sxm-border/60 overflow-hidden shadow-xl">
-        {sortedStations.map((station) => {
+      {sortedStations.length === 0 ? (
+        <div className="text-center py-20 px-6 space-y-3 bg-sxm-surface rounded-3xl border border-sxm-border/60">
+          <div className="w-14 h-14 rounded-full bg-sxm-card flex items-center justify-center mx-auto text-sxm-muted">
+            <Radio className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-white">No Channels to Display</h3>
+          <p className="text-xs text-sxm-muted">
+            No stations found matching this category or connection.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-sxm-border/40 bg-sxm-surface rounded-3xl border border-sxm-border/60 overflow-hidden shadow-xl">
+          {sortedStations.map((station) => {
           const isPlayingThis = isCurrentPlayingStation(station);
           const isFav = isFavorite(station.station.id);
           const channelNum = station.channel_number || station.station.id;
@@ -144,6 +155,7 @@ export const GuideView: React.FC<GuideViewProps> = ({ stations }) => {
           );
         })}
       </div>
+      )}
     </div>
   );
 };
